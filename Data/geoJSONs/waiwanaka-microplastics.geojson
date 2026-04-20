@@ -1,0 +1,105 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    169.151471,
+                    -44.664121
+                ]
+            },
+            "properties": {
+                "id": "microplastics-point-1",
+                "site_name": "Outlet ",
+                "colour": "#000000",
+                "count": 2,
+                "urls": [],
+                "data_points": [
+                    {
+                        "date_recorded": "Autumn 2024",
+                        "microplastics per 60 litre": null
+                    },
+                    {
+                        "date_recorded": "Summer 2025",
+                        "microplastics per 60 litre": null
+                    }
+                ],
+                "date_recorded": "Autumn 2024"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    169.135605,
+                    -44.692602
+                ]
+            },
+            "properties": {
+                "id": "microplastics-point-2",
+                "site_name": "Wanaka Spring",
+                "colour": "#000000",
+                "count": 1,
+                "urls": [],
+                "data_points": [
+                    {
+                        "date_recorded": "Spring 2024",
+                        "microplastics per 60 litre": null
+                    }
+                ],
+                "date_recorded": "Spring 2024"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    168.715986,
+                    -45.018933
+                ]
+            },
+            "properties": {
+                "id": "microplastics-point-4",
+                "site_name": "Frankton Marina",
+                "colour": "#000000",
+                "count": 1,
+                "urls": [],
+                "data_points": [
+                    {
+                        "date_recorded": "Spring 2024",
+                        "microplastics per 60 litre": 25.2
+                    }
+                ],
+                "date_recorded": "Spring 2024"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    169.135693,
+                    -44.693178
+                ]
+            },
+            "properties": {
+                "id": "microplastics-point-5",
+                "site_name": "Bullock Creek",
+                "colour": "#000000",
+                "count": 1,
+                "urls": [],
+                "data_points": [
+                    {
+                        "date_recorded": "Autumn 2025",
+                        "microplastics per 60 litre": 22.0
+                    }
+                ],
+                "date_recorded": "Autumn 2025"
+            }
+        }
+    ]
+}

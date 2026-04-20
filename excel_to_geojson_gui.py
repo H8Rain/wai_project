@@ -1,6 +1,15 @@
-import tkinter as tk
-from tkinter import ttk  # For themed widgets like Combobox
-from tkinter import scrolledtext # For the output area
+try:
+    import tkinter as tk
+    from tkinter import ttk  # For themed widgets like Combobox
+    from tkinter import scrolledtext  # For the output area
+    from tkinter import filedialog
+    from tkinter import messagebox  # To show error popups
+except ImportError:
+    tk = None
+    ttk = None
+    scrolledtext = None
+    filedialog = None
+    messagebox = None
 import threading # To keep the GUI responsive during processing
 
 import pandas as pd
@@ -9,8 +18,7 @@ import requests
 import base64
 from io import BytesIO
 import os
-from tkinter import filedialog
-from tkinter import messagebox # To show error popups
+import warnings
 
 
 from geopy.distance import geodesic
@@ -35,9 +43,7 @@ try:
     REPO_NAME = config.get('GitHub', 'RepoName')
     GITHUB_TOKEN = config.get('GitHub', 'Token')
 except (configparser.NoSectionError, configparser.NoOptionError) as e:
-
-    print(f"Error reading from config.ini: {e}")
-  
+    # GitHub upload is optional for local workflow; keep converter usable without config.ini.
     GITHUB_USERNAME, REPO_NAME, GITHUB_TOKEN = None, None, None
 
 
@@ -46,36 +52,59 @@ DATASETS = {
         "sheet_name": "Secchi",
         "geojson_file": "Data/geoJSONs/waiwanaka-secchi.geojson",
         "lat_col_start": "SurveyAreaLatitudeStart",
+        "lat_col_candidates": ["Latitude", "Lat"],
         "lon_col_start": "SurveyAreaLongitudeStart",
-        "url_col": "url"
+        "lon_col_candidates": ["Longitude", "Lon", "Lng"],
+        "url_col": "url",
     },
     "stream testing": {
         "sheet_name": "Stream",
         "geojson_file": "Data/geoJSONs/waiwanaka-stream-testing.geojson",
         "lat_col_start": "SurveyAreaLatitudeStart",
+        "lat_col_candidates": ["Latitude", "Lat"],
         "lon_col_start": "SurveyAreaLongitudeStart",
-        "url_col": "url"
+        "lon_col_candidates": ["Longitude", "Lon", "Lng"],
+        "url_col": "url",
     },
     "litter intelligence": {
         "sheet_name": "Litter",
         "base_geojson_path_by_type": "Data/geoJSONs/waiwanaka-litter-intelligence-",
         "lat_col_start": "SurveyAreaLatitudeStart",
+        "lat_col_candidates": ["Latitude", "Lat"],
         "lon_col_start": "SurveyAreaLongitudeStart",
+        "lon_col_candidates": ["Longitude", "Lon", "Lng"],
         "lat_col_end": "SurveyAreaLatitudeEnd",
+        "lat_col_end_candidates": ["LatitudeEnd", "EndLatitude"],
         "lon_col_end": "SurveyAreaLongitudeEnd",
+        "lon_col_end_candidates": ["LongitudeEnd", "EndLongitude"],
         "url_col": "url",
-        "types": ["beach", "freshwater", "stormwater", "unknown"]
+        "survey_type_col": "type",
+        "types": ["beach", "freshwater", "stormwater", "unknown"],
     },
     "microplastics": {
         "sheet_name": "Microplastics",
         "geojson_file": "Data/geoJSONs/waiwanaka-microplastics.geojson",
         "lat_col_start": "SurveyAreaLatitudeStart",
+        "lat_col_candidates": ["Latitude", "Lat"],
         "lon_col_start": "SurveyAreaLongitudeStart",
-        "url_col": "url"
-    }
+        "lon_col_candidates": ["Longitude", "Lon", "Lng"],
+        "url_col": "url",
+    },
+    "gyfw": {
+        "sheet_name": "GetYourFeetWet",
+        "sheet_name_candidates": ["GYFW", "Get Your Feet Wet"],
+        "geojson_file": "Data/geoJSONs/waiwanaka-gyfw.geojson",
+        "lat_col_start": "SurveyAreaLatitudeStart",
+        "lat_col_candidates": ["Latitude", "Lat", "Site Latitude"],
+        "lon_col_start": "SurveyAreaLongitudeStart",
+        "lon_col_candidates": ["Longitude", "Lon", "Lng", "Site Longitude"],
+        "url_col": "url",
+        "url_col_candidates": ["URL", "Link"],
+    },
 }
 
-EXCEL_PATH = os.path.join(SCRIPT_DIR, "..", "..", "Data", "excel datasheets", "Wai-Wanaka-Mapping-Data.xlsx")
+EXCEL_PATH = os.path.join(SCRIPT_DIR, "Wai-Wanaka-Mapping-Data.xlsx")
+OUTPUT_ROOT = SCRIPT_DIR
 
 def build_rectangle_from_line(start_lat, start_lon, end_lat, end_lon, width_m=20):
     # ... (your existing build_rectangle_from_line function code) ...
@@ -133,70 +162,164 @@ def build_rectangle_from_line(start_lat, start_lon, end_lat, end_lon, width_m=20
     return mapping(rectangle), (centre.y, centre.x)
 
 
-def convert_excel_to_geojson(dataset_name, progress_callback=None): 
-
-    if dataset_name not in DATASETS:
-        if progress_callback:
-            progress_callback(f"❌ Invalid dataset: {dataset_name}")
-        else:
-            print(f"❌ Invalid dataset: {dataset_name}")
-        return []
-    
-    config = DATASETS[dataset_name]
-    sheet_name = config["sheet_name"]
-    is_litter = dataset_name == "litter intelligence"
-    output_file_paths = []
+def _log_message(message, progress_callback=None):
+    if progress_callback:
+        progress_callback(message)
+        return
 
     try:
-        data_sheet = pd.read_excel(EXCEL_PATH, sheet_name=sheet_name)
-        if progress_callback:
-            progress_callback(f"Successfully read sheet '{sheet_name}'. Number of rows: {len(data_sheet)}")
-        else:
-            print(f"Successfully read sheet '{sheet_name}'. Number of rows: {len(data_sheet)}")
+        print(message)
+    except UnicodeEncodeError:
+        safe_message = str(message).encode("ascii", "replace").decode("ascii")
+        print(safe_message)
 
+
+def _first_existing_column(data_sheet, primary, fallback_candidates=None):
+    candidates = [primary] if primary else []
+    candidates.extend(fallback_candidates or [])
+    for candidate in candidates:
+        if candidate in data_sheet.columns:
+            return candidate
+    return None
+
+
+def _normalize_date(value, allow_raw=False):
+    if pd.isna(value):
+        return None
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=UserWarning)
+            parsed = pd.to_datetime(value, errors="coerce")
+        if not pd.isna(parsed):
+            return parsed.isoformat()
+    except Exception:
+        pass
+
+    if allow_raw:
+        return str(value).strip()
+    return str(value)
+
+
+def _sheet_candidates(config):
+    return [config["sheet_name"]] + config.get("sheet_name_candidates", [])
+
+
+def _read_dataset_sheet(excel_path, config):
+    last_error = None
+    for sheet in _sheet_candidates(config):
+        try:
+            return pd.read_excel(excel_path, sheet_name=sheet), sheet
+        except ValueError as exc:
+            # Keep trying alternate sheet names.
+            last_error = exc
+        except Exception:
+            raise
+
+    if last_error:
+        raise last_error
+    raise ValueError(f"Unable to read sheet for config: {config.get('sheet_name')}")
+
+
+def _ensure_geojson_output(repo_relative_path, output_root):
+    local_save_path = os.path.join(output_root, repo_relative_path)
+    os.makedirs(os.path.dirname(local_save_path), exist_ok=True)
+    return local_save_path
+
+
+def _write_geojson_file(local_save_path, features):
+    geojson_data = {"type": "FeatureCollection", "features": features}
+    with open(local_save_path, "w", encoding="utf-8") as geojson_file:
+        json.dump(geojson_data, geojson_file, indent=4)
+
+
+def convert_excel_to_geojson(dataset_name, progress_callback=None, excel_path=None, output_root=None):
+    if dataset_name not in DATASETS:
+        _log_message(f"Invalid dataset: {dataset_name}", progress_callback)
+        return []
+
+    config = DATASETS[dataset_name]
+    is_litter = dataset_name == "litter intelligence"
+    excel_path_to_use = excel_path or EXCEL_PATH
+    output_root_to_use = output_root or OUTPUT_ROOT
+    output_file_paths = []
+
+    if not os.path.exists(excel_path_to_use):
+        _log_message(f"Excel file not found: {excel_path_to_use}", progress_callback)
+        return []
+
+    try:
+        data_sheet, resolved_sheet_name = _read_dataset_sheet(excel_path_to_use, config)
+        _log_message(
+            f"Read sheet '{resolved_sheet_name}' for {dataset_name}. Rows: {len(data_sheet)}",
+            progress_callback,
+        )
+        lat_col_start = _first_existing_column(
+            data_sheet, config.get("lat_col_start"), config.get("lat_col_candidates")
+        )
+        lon_col_start = _first_existing_column(
+            data_sheet, config.get("lon_col_start"), config.get("lon_col_candidates")
+        )
+        url_col = _first_existing_column(
+            data_sheet, config.get("url_col", "url"), config.get("url_col_candidates")
+        )
+        site_name_col = _first_existing_column(data_sheet, "Site Name", ["SiteName", "site_name"])
+        date_col = _first_existing_column(data_sheet, "Date Recorded", ["Date", "Recorded Date"])
+
+        if not lat_col_start or not lon_col_start:
+            _log_message(
+                f"Missing latitude/longitude columns for {dataset_name}. "
+                f"Expected one of {config.get('lat_col_start')} / {config.get('lon_col_start')}.",
+                progress_callback,
+            )
+
+            if is_litter:
+                for survey_type in config["types"]:
+                    repo_relative_path = f"{config['base_geojson_path_by_type']}{survey_type}.geojson"
+                    local_save_path = _ensure_geojson_output(repo_relative_path, output_root_to_use)
+                    _write_geojson_file(local_save_path, [])
+                    output_file_paths.append({"local": local_save_path, "repo": repo_relative_path})
+            else:
+                repo_relative_path = config.get("geojson_file")
+                local_save_path = _ensure_geojson_output(repo_relative_path, output_root_to_use)
+                _write_geojson_file(local_save_path, [])
+                output_file_paths.append({"local": local_save_path, "repo": repo_relative_path})
+            return output_file_paths
 
         if is_litter:
+            lat_col_end = _first_existing_column(
+                data_sheet, config.get("lat_col_end"), config.get("lat_col_end_candidates")
+            )
+            lon_col_end = _first_existing_column(
+                data_sheet, config.get("lon_col_end"), config.get("lon_col_end_candidates")
+            )
+            survey_type_col = _first_existing_column(
+                data_sheet, config.get("survey_type_col", "type"), ["Type", "survey_type"]
+            )
             features_by_type = {survey_type: [] for survey_type in config["types"]}
             aggregated_points_by_type = {survey_type: {} for survey_type in config["types"]}
-
             for idx, row in data_sheet.iterrows():
-                lat_col_start = config.get("lat_col_start")
-                lon_col_start = config.get("lon_col_start")
-                url_col = config.get("url_col", "url")
-
                 lat_start_raw = row.get(lat_col_start)
                 lon_start_raw = row.get(lon_col_start)
-                url = row.get(url_col, "")
-
                 if pd.isna(lat_start_raw) or pd.isna(lon_start_raw):
                     continue
-
-                lat_start = round(float(lat_start_raw), 6)
-                lon_start = round(float(lon_start_raw), 6)
-                
-                site_name = row.get("Site Name", f"Litter Site {idx + 1}")
-                date_recorded_raw = row.get("Date Recorded")
-                date_recorded_str = None
-                if pd.notna(date_recorded_raw):
-                    try:
-                        date_recorded = pd.to_datetime(date_recorded_raw, errors="coerce")
-                        if not pd.isna(date_recorded):
-                            date_recorded_str = date_recorded.isoformat()
-                    except Exception: # Handle potential errors if date format is unexpected
-                        date_recorded_str = str(date_recorded_raw)
-
-
-                survey_type_col = "type" 
-                raw_survey_type_value = row.get(survey_type_col)
-                
-                current_survey_type = "unknown" 
-                if pd.notna(raw_survey_type_value) and isinstance(raw_survey_type_value, str):
+                try:
+                    lat_start = round(float(lat_start_raw), 6)
+                    lon_start = round(float(lon_start_raw), 6)
+                except (TypeError, ValueError):
+                    continue
+                url = row.get(url_col, "") if url_col else ""
+                site_name = row.get(site_name_col, f"Litter Site {idx + 1}") if site_name_col else f"Litter Site {idx + 1}"
+                date_recorded_raw = row.get(date_col) if date_col else None
+                date_recorded_str = _normalize_date(date_recorded_raw)
+                raw_survey_type_value = row.get(survey_type_col) if survey_type_col else None
+                current_survey_type = "unknown"
+                if pd.notna(raw_survey_type_value):
                     processed_type = str(raw_survey_type_value).strip().lower()
-                    if processed_type in config["types"]: 
+                    if processed_type in config["types"]:
                         current_survey_type = processed_type
-                    elif not processed_type: 
+                    elif processed_type == "":
                         current_survey_type = "unknown"
-                
                 properties_base = {
                     "url": url,
                     "site_name": site_name,
@@ -205,166 +328,139 @@ def convert_excel_to_geojson(dataset_name, progress_callback=None):
                 }
                 if date_recorded_str:
                     properties_base["date_recorded"] = date_recorded_str
-
-                lat_end_raw = row.get(config.get("lat_col_end"))
-                lon_end_raw = row.get(config.get("lon_col_end"))
-
-                if pd.notna(lat_end_raw) and pd.notna(lon_end_raw): 
-                    lat_end = round(float(lat_end_raw), 6)
-                    lon_end = round(float(lon_end_raw), 6)
-                    geometry_polygon, centroid_coords = build_rectangle_from_line(lat_start, lon_start, lat_end, lon_end)
-
+                lat_end_raw = row.get(lat_col_end) if lat_col_end else None
+                lon_end_raw = row.get(lon_col_end) if lon_col_end else None
+                has_end_coords = pd.notna(lat_end_raw) and pd.notna(lon_end_raw)
+                if has_end_coords:
+                    try:
+                        lat_end = round(float(lat_end_raw), 6)
+                        lon_end = round(float(lon_end_raw), 6)
+                    except (TypeError, ValueError):
+                        has_end_coords = False
+                if has_end_coords:
+                    geometry_polygon, centroid_coords = build_rectangle_from_line(
+                        lat_start, lon_start, lat_end, lon_end
+                    )
                     polygon_props = properties_base.copy()
-                    polygon_props.update({
-                        "id": f"survey-polygon-{current_survey_type}-{idx + 1}",
-                        "centroid_coordinates": centroid_coords
-                    })
-                    polygon_feature = {"type": "Feature", "properties": polygon_props, "geometry": geometry_polygon}
+                    polygon_props.update(
+                        {
+                            "id": f"survey-polygon-{current_survey_type}-{idx + 1}",
+                            "centroid_coordinates": centroid_coords,
+                        }
+                    )
+                    polygon_feature = {
+                        "type": "Feature",
+                        "properties": polygon_props,
+                        "geometry": geometry_polygon,
+                    }
                     features_by_type[current_survey_type].append(polygon_feature)
-
                     centroid_props = properties_base.copy()
-                    centroid_props.update({
-                        "id": f"survey-centroid-{current_survey_type}-{idx + 1}",
-                        "is_centroid": True
-                    })
+                    centroid_props.update(
+                        {
+                            "id": f"survey-centroid-{current_survey_type}-{idx + 1}",
+                            "is_centroid": True,
+                        }
+                    )
                     centroid_feature = {
                         "type": "Feature",
                         "properties": centroid_props,
-                        "geometry": {"type": "Point", "coordinates": [centroid_coords[1], centroid_coords[0]]}
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [centroid_coords[1], centroid_coords[0]],
+                        },
                     }
                     features_by_type[current_survey_type].append(centroid_feature)
-                else: 
+                else:
                     point_key = f"{lon_start}-{lat_start}"
                     current_type_aggregated_points = aggregated_points_by_type[current_survey_type]
-
-                    # Create details for the current survey event
                     current_event_detail = {}
                     if date_recorded_str:
                         current_event_detail["date_recorded"] = date_recorded_str
                     if url:
                         current_event_detail["url"] = url
-                    
-                    # Check if there's meaningful data for the event
-                    is_meaningful_event = bool(current_event_detail.get("date_recorded") or current_event_detail.get("url"))
-
                     if point_key in current_type_aggregated_points:
                         current_type_aggregated_points[point_key]["properties"]["count"] += 1
-                        if is_meaningful_event:
-                            current_type_aggregated_points[point_key]["properties"]["survey_events"].append(current_event_detail)
+                        if current_event_detail:
+                            current_type_aggregated_points[point_key]["properties"]["survey_events"].append(
+                                current_event_detail
+                            )
                     else:
                         point_props = properties_base.copy()
-                        point_props.update({
-                            "id": f"survey-point-{current_survey_type}-{idx + 1}",
-                            "count": 1,
-                            "survey_events": [current_event_detail] if current_event_detail else [],
-                            "is_centroid": False
-                        })
+                        point_props.update(
+                            {
+                                "id": f"survey-point-{current_survey_type}-{idx + 1}",
+                                "count": 1,
+                                "survey_events": [current_event_detail] if current_event_detail else [],
+                                "is_centroid": False,
+                            }
+                        )
                         current_type_aggregated_points[point_key] = {
                             "type": "Feature",
                             "properties": point_props,
-                            "geometry": {"type": "Point", "coordinates": [lon_start, lat_start]}
+                            "geometry": {"type": "Point", "coordinates": [lon_start, lat_start]},
                         }
-            
             for survey_type_key in config["types"]:
-                features_by_type[survey_type_key].extend(list(aggregated_points_by_type[survey_type_key].values()))
-
+                features_by_type[survey_type_key].extend(
+                    list(aggregated_points_by_type[survey_type_key].values())
+                )
             for survey_type, features_list in features_by_type.items():
-                if features_list:
-                    # Construct the REPO-RELATIVE path for GitHub
-                    repo_relative_path = f"{config['base_geojson_path_by_type']}{survey_type}.geojson"
-                    # Construct the ABSOLUTE LOCAL path for saving the file
-                    local_save_path = os.path.join(SCRIPT_DIR, "..", "..", repo_relative_path)
-
-                    # Ensure directory exists locally
-                    os.makedirs(os.path.dirname(local_save_path), exist_ok=True)
-
-                    geojson_data = {"type": "FeatureCollection", "features": features_list}
-                    with open(local_save_path, "w") as f: # Save to absolute local path
-                        json.dump(geojson_data, f, indent=4)
-
-                    msg = f"✅ GeoJSON saved for litter type '{survey_type}': {local_save_path}"
-                    if progress_callback: progress_callback(msg)
-                    else: print(msg)
-                    # Use absolute local path for 'local', repo-relative path for 'repo'
-                    output_file_paths.append({"local": local_save_path, "repo": repo_relative_path})
-
-             
-        
-        else: # For Secchi, Stream Testing, Microplastics
-            # Get the REPO-RELATIVE path from config
+                repo_relative_path = f"{config['base_geojson_path_by_type']}{survey_type}.geojson"
+                local_save_path = _ensure_geojson_output(repo_relative_path, output_root_to_use)
+                _write_geojson_file(local_save_path, features_list)
+                _log_message(
+                    f"GeoJSON saved for litter type '{survey_type}' with {len(features_list)} features: {local_save_path}",
+                    progress_callback,
+                )
+                output_file_paths.append({"local": local_save_path, "repo": repo_relative_path})
+        else:
             repo_relative_path = config.get("geojson_file")
-            # Construct the ABSOLUTE LOCAL path for saving
-            local_save_path = os.path.join(SCRIPT_DIR, "..", "..", repo_relative_path)
-
-            # Ensure directory exists locally
-            os.makedirs(os.path.dirname(local_save_path), exist_ok=True)
-
+            local_save_path = _ensure_geojson_output(repo_relative_path, output_root_to_use)
             aggregated_points_generic = {}
-            all_features_generic = []
-
             for idx, row in data_sheet.iterrows():
-                lat_col_start = config.get("lat_col_start")
-                lon_col_start = config.get("lon_col_start")
-                url_col = config.get("url_col", "url")
                 lat_start_raw = row.get(lat_col_start)
                 lon_start_raw = row.get(lon_col_start)
-                url = row.get(url_col, "")
-
                 if pd.isna(lat_start_raw) or pd.isna(lon_start_raw):
                     continue
-                
-                lat_start = round(float(lat_start_raw), 6)
-                lon_start = round(float(lon_start_raw), 6)
+                try:
+                    lat_start = round(float(lat_start_raw), 6)
+                    lon_start = round(float(lon_start_raw), 6)
+                except (TypeError, ValueError):
+                    continue
                 point_key = f"{lon_start}-{lat_start}"
-
-                site_name_col = "Site Name"
-                date_col = "Date Recorded"
-                id_col = "ID" 
-
-                site_name = row.get(site_name_col, f"Site-{idx+1}")
-                date_recorded_raw = row.get(date_col)
-                date_recorded_str = None
-                if pd.notna(date_recorded_raw):
-                    try:
-                        if sheet_name == 'Microplastics':
-                            date_recorded_str = str(date_recorded_raw).strip()
-                        else:
-                            date_recorded = pd.to_datetime(date_recorded_raw, errors="coerce")
-                            if not pd.isna(date_recorded):
-                                date_recorded_str = date_recorded.isoformat()
-                    except Exception:
-                        date_recorded_str = str(date_recorded_raw)
-
-                
-                data_point_info = {"url": url} 
+                url = row.get(url_col, "") if url_col else ""
+                site_name = row.get(site_name_col, f"Site-{idx + 1}") if site_name_col else f"Site-{idx + 1}"
+                date_recorded_raw = row.get(date_col) if date_col else None
+                date_recorded_str = _normalize_date(
+                    date_recorded_raw, allow_raw=(resolved_sheet_name.lower() == "microplastics")
+                )
+                data_point_info = {}
+                if url:
+                    data_point_info["url"] = url
                 if date_recorded_str:
                     data_point_info["date_recorded"] = date_recorded_str
-                
                 skip_cols_list = [
-                    config.get("lat_col_start"), config.get("lon_col_start"),
-                    config.get("lat_col_end"), config.get("lon_col_end"), # Add end cols if they exist
-                    config.get("url_col"),
-                    "Site Name", "Date Recorded", "ID", "type" # Add other common metadata cols
+                    lat_col_start,
+                    lon_col_start,
+                    config.get("lat_col_end"),
+                    config.get("lon_col_end"),
+                    url_col,
+                    site_name_col,
+                    date_col,
+                    "ID",
+                    "type",
                 ]
-                # Filter out None values from skip_cols_list, in case some configs don't have all keys
-                skip_cols = [col for col in skip_cols_list if col is not None]
-
-
-                for col_name_iter in data_sheet.columns: 
-                    if col_name_iter not in skip_cols:
-                        value = row[col_name_iter]
-                        if pd.isna(value):
-                            data_point_info[col_name_iter] = None
-                        else:
-                            data_point_info[col_name_iter] = value
-                            
+                skip_cols = [col for col in skip_cols_list if col]
+                for col_name_iter in data_sheet.columns:
+                    if col_name_iter in skip_cols:
+                        continue
+                    value = row[col_name_iter]
+                    data_point_info[col_name_iter] = None if pd.isna(value) else value
                 if point_key in aggregated_points_generic:
-                    aggregated_points_generic[point_key]["properties"]["count"] += 1
-                    if url and url not in aggregated_points_generic[point_key]["properties"]["urls"]:
-                         aggregated_points_generic[point_key]["properties"]["urls"].append(url)
-                    if "data_points" not in aggregated_points_generic[point_key]["properties"]:
-                        aggregated_points_generic[point_key]["properties"]["data_points"] = []
-                    aggregated_points_generic[point_key]["properties"]["data_points"].append(data_point_info)
+                    feature_props = aggregated_points_generic[point_key]["properties"]
+                    feature_props["count"] += 1
+                    if url and url not in feature_props["urls"]:
+                        feature_props["urls"].append(url)
+                    feature_props["data_points"].append(data_point_info)
                 else:
                     props = {
                         "id": f"{dataset_name.replace(' ', '-')}-point-{idx + 1}",
@@ -372,45 +468,27 @@ def convert_excel_to_geojson(dataset_name, progress_callback=None):
                         "colour": config.get("colour", "#000000"),
                         "count": 1,
                         "urls": [url] if url else [],
-                        "data_points": [data_point_info] # Store all other row data here
+                        "data_points": [data_point_info],
                     }
-                    if date_recorded_str: 
+                    if date_recorded_str:
                         props["date_recorded"] = date_recorded_str
-                    
                     aggregated_points_generic[point_key] = {
                         "type": "Feature",
                         "geometry": {"type": "Point", "coordinates": [lon_start, lat_start]},
-                        "properties": props
+                        "properties": props,
                     }
-            all_features_generic.extend(list(aggregated_points_generic.values()))
-            
-            if all_features_generic:
-                geojson_data = {"type": "FeatureCollection", "features": all_features_generic}
-                with open(local_save_path, "w") as f: # Save to absolute local path
-                    json.dump(geojson_data, f, indent=4)
-                msg = f"✅ GeoJSON saved for {dataset_name}: {local_save_path}"
-                if progress_callback: progress_callback(msg)
-                else: print(msg)
-                # Use absolute local path for 'local', repo-relative path for 'repo'
-                output_file_paths.append({"local": local_save_path, "repo": repo_relative_path})
-            else:
-                msg = f"ℹ️ No features generated for {dataset_name}."
-                if progress_callback: progress_callback(msg)
-                else: print(msg)
-
+            all_features_generic = list(aggregated_points_generic.values())
+            _write_geojson_file(local_save_path, all_features_generic)
+            _log_message(
+                f"GeoJSON saved for {dataset_name} with {len(all_features_generic)} features: {local_save_path}",
+                progress_callback,
+            )
+            output_file_paths.append({"local": local_save_path, "repo": repo_relative_path})
         return output_file_paths
-
     except Exception as e:
-        err_msg = f"❌ Error processing {dataset_name}: {e}"
-        if progress_callback:
-            progress_callback(err_msg)
-        else:
-            print(err_msg)
+        _log_message(f"Error processing {dataset_name}: {e}", progress_callback)
         import traceback
-        # To print traceback to console even when using GUI:
-        traceback.print_exc() 
-        # If you want traceback in GUI (can be long):
-        # if progress_callback: progress_callback(traceback.format_exc())
+        traceback.print_exc()
         return []
 
 
@@ -423,7 +501,7 @@ def upload_to_github(local_file_path, repo_file_path, progress_callback=None): #
             content = file.read()
             encoded_content = base64.b64encode(content).decode("utf-8")
     except FileNotFoundError:
-        msg = f"❌ Local file not found for upload: {local_file_path}"
+        msg = f"鉂?Local file not found for upload: {local_file_path}"
         if progress_callback: progress_callback(msg)
         else: print(msg)
         return
@@ -437,7 +515,7 @@ def upload_to_github(local_file_path, repo_file_path, progress_callback=None): #
     if response_get.status_code == 200:
         sha = response_get.json().get("sha")
     elif response_get.status_code != 404:
-        msg = f"❌ Error checking file on GitHub ({repo_file_path}): {response_get.status_code} - {response_get.text}"
+        msg = f"鉂?Error checking file on GitHub ({repo_file_path}): {response_get.status_code} - {response_get.text}"
         if progress_callback: progress_callback(msg)
         else: print(msg)
         # Don't return here, allow attempt to upload if it's just a check error but not 404
@@ -454,15 +532,15 @@ def upload_to_github(local_file_path, repo_file_path, progress_callback=None): #
     if response_put.status_code in [200, 201]: # 200 for update, 201 for create
         try:
             html_url = response_put.json().get("content", {}).get("html_url", "N/A")
-            msg = f"✅ Upload successful for {repo_file_path}: {html_url}"
+            msg = f"鉁?Upload successful for {repo_file_path}: {html_url}"
             if progress_callback: progress_callback(msg)
             else: print(msg)
         except Exception: # Catch potential errors if response JSON is not as expected
-            msg = f"✅ Upload successful for {repo_file_path} (Status: {response_put.status_code})"
+            msg = f"鉁?Upload successful for {repo_file_path} (Status: {response_put.status_code})"
             if progress_callback: progress_callback(msg)
             else: print(msg)
     else:
-        msg = f"❌ Upload failed for {repo_file_path}: {response_put.status_code} - {response_put.text}"
+        msg = f"鉂?Upload failed for {repo_file_path}: {response_put.status_code} - {response_put.text}"
         if progress_callback: progress_callback(msg)
         else: print(msg)
 
@@ -552,12 +630,12 @@ class GeoJSONApp:
     def processing_logic(self):
         if not all([GITHUB_USERNAME, REPO_NAME, GITHUB_TOKEN]):
             messagebox.showerror("Configuration Error", "GitHub details are missing. Please check your config.ini file.")
-            self.log_message("❌ Error: Could not load GitHub configuration.")
+            self.log_message("鉂?Error: Could not load GitHub configuration.")
             return
         global EXCEL_PATH
         if not EXCEL_PATH or not os.path.exists(EXCEL_PATH):
             messagebox.showerror("Error", "Please select a valid Excel file before running the conversion.")
-            self.log_message("❌ Error: No valid Excel file selected.")
+            self.log_message("鉂?Error: No valid Excel file selected.")
             return # Stop processing
         self.run_button.config(state=tk.DISABLED)
         self.clear_log()
@@ -567,7 +645,7 @@ class GeoJSONApp:
         
         datasets_to_process = []
         if not dataset_type_input:
-            self.log_message("❌ No dataset type selected.")
+            self.log_message("鉂?No dataset type selected.")
             self.run_button.config(state=tk.NORMAL)
             return
 
@@ -576,12 +654,12 @@ class GeoJSONApp:
         elif dataset_type_input in DATASETS:
             datasets_to_process = [dataset_type_input]
         else:
-            self.log_message(f"❌ Invalid dataset type selected: {dataset_type_input}")
+            self.log_message(f"鉂?Invalid dataset type selected: {dataset_type_input}")
             self.run_button.config(state=tk.NORMAL)
             return
 
         for dataset_name in datasets_to_process:
-            self.log_message(f"\n📌 Processing {dataset_name}...")
+            self.log_message(f"\n馃搶 Processing {dataset_name}...")
             # Pass the log_message method as the progress_callback
             generated_files_info = convert_excel_to_geojson(dataset_name, progress_callback=self.log_message)
 
@@ -590,10 +668,10 @@ class GeoJSONApp:
                     # Pass the log_message method as the progress_callback
                     upload_to_github(file_info["local"], file_info["repo"], progress_callback=self.log_message)
                 else:
-                    self.log_message(f"⚠️ Skipping upload for an invalid file entry for {dataset_name}. Info: {file_info}")
-            self.log_message(f"✅ Finished processing dataset: {dataset_name}")
+                    self.log_message(f"鈿狅笍 Skipping upload for an invalid file entry for {dataset_name}. Info: {file_info}")
+            self.log_message(f"鉁?Finished processing dataset: {dataset_name}")
         
-        self.log_message("\n🎉 All selected datasets processed!")
+        self.log_message("\n馃帀 All selected datasets processed!")
         self.run_button.config(state=tk.NORMAL)
 
 
@@ -630,3 +708,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = GeoJSONApp(root)
     root.mainloop()
+

@@ -1,0 +1,6 @@
+.idea/
+Lib/
+Scripts/
+uploads/
+__pycache__/
+*.pyc

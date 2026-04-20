@@ -1,0 +1,153 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    169.135683,
+                    -44.693169
+                ]
+            },
+            "properties": {
+                "id": "stream-testing-point-1",
+                "site_name": "Bullock Creek",
+                "colour": "#000000",
+                "count": 4,
+                "urls": [],
+                "data_points": [
+                    {
+                        "date_recorded": "2025-02-17T12:52:00",
+                        "Escherichia coli (MPN / 100mL)": 47,
+                        "Turbidity (NTU)": 0.1,
+                        "pH ": 7.8,
+                        "Electrical Conductivity (EC) (microS/m)": 140,
+                        "Nitrate-N + Nitrite-N (g/m3)": 0.82
+                    },
+                    {
+                        "date_recorded": "2024-11-19T10:45:00",
+                        "Escherichia coli (MPN / 100mL)": 64,
+                        "Turbidity (NTU)": 0.16,
+                        "pH ": 7.8,
+                        "Electrical Conductivity (EC) (microS/m)": 345,
+                        "Nitrate-N + Nitrite-N (g/m3)": 0.82
+                    },
+                    {
+                        "date_recorded": "2025-08-15T10:56:00",
+                        "Escherichia coli (MPN / 100mL)": 3,
+                        "Turbidity (NTU)": 0.11,
+                        "pH ": 7.8,
+                        "Electrical Conductivity (EC) (microS/m)": 140,
+                        "Nitrate-N + Nitrite-N (g/m3)": 1.0
+                    },
+                    {
+                        "date_recorded": "2025-11-17T09:04:00",
+                        "Escherichia coli (MPN / 100mL)": 66,
+                        "Turbidity (NTU)": 0.72,
+                        "pH ": 7.7,
+                        "Electrical Conductivity (EC) (microS/m)": 142,
+                        "Nitrate-N + Nitrite-N (g/m3)": 0.97
+                    }
+                ],
+                "date_recorded": "2025-02-17T12:52:00"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    169.123049,
+                    -44.699521
+                ]
+            },
+            "properties": {
+                "id": "stream-testing-point-3",
+                "site_name": "Middle Creek",
+                "colour": "#000000",
+                "count": 3,
+                "urls": [],
+                "data_points": [
+                    {
+                        "date_recorded": "2025-02-17T12:42:00",
+                        "Escherichia coli (MPN / 100mL)": 93,
+                        "Turbidity (NTU)": 0.45,
+                        "pH ": 8.0,
+                        "Electrical Conductivity (EC) (microS/m)": 310,
+                        "Nitrate-N + Nitrite-N (g/m3)": 1.98
+                    },
+                    {
+                        "date_recorded": "2025-08-15T10:31:00",
+                        "Escherichia coli (MPN / 100mL)": 5,
+                        "Turbidity (NTU)": 0.18,
+                        "pH ": 7.9,
+                        "Electrical Conductivity (EC) (microS/m)": 316,
+                        "Nitrate-N + Nitrite-N (g/m3)": 2.1
+                    },
+                    {
+                        "date_recorded": "2025-11-17T08:54:00",
+                        "Escherichia coli (MPN / 100mL)": 193,
+                        "Turbidity (NTU)": 0.82,
+                        "pH ": 7.8,
+                        "Electrical Conductivity (EC) (microS/m)": 326,
+                        "Nitrate-N + Nitrite-N (g/m3)": 2.3
+                    }
+                ],
+                "date_recorded": "2025-02-17T12:42:00"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    169.11927,
+                    -44.699761
+                ]
+            },
+            "properties": {
+                "id": "stream-testing-point-4",
+                "site_name": "Stoney Creek",
+                "colour": "#000000",
+                "count": 4,
+                "urls": [],
+                "data_points": [
+                    {
+                        "date_recorded": "2025-02-17T12:36:00",
+                        "Escherichia coli (MPN / 100mL)": 162,
+                        "Turbidity (NTU)": 1.91,
+                        "pH ": 8.0,
+                        "Electrical Conductivity (EC) (microS/m)": 141,
+                        "Nitrate-N + Nitrite-N (g/m3)": 2.5
+                    },
+                    {
+                        "date_recorded": "2024-11-19T11:16:00",
+                        "Escherichia coli (MPN / 100mL)": 104,
+                        "Turbidity (NTU)": 1.16,
+                        "pH ": 8.0,
+                        "Electrical Conductivity (EC) (microS/m)": 138,
+                        "Nitrate-N + Nitrite-N (g/m3)": 0.22
+                    },
+                    {
+                        "date_recorded": "2025-08-15T10:15:00",
+                        "Escherichia coli (MPN / 100mL)": 4,
+                        "Turbidity (NTU)": 1.12,
+                        "pH ": 8.1,
+                        "Electrical Conductivity (EC) (microS/m)": 407,
+                        "Nitrate-N + Nitrite-N (g/m3)": 3.2
+                    },
+                    {
+                        "date_recorded": "2025-11-17T08:47:00",
+                        "Escherichia coli (MPN / 100mL)": 126,
+                        "Turbidity (NTU)": 6.2,
+                        "pH ": 7.9,
+                        "Electrical Conductivity (EC) (microS/m)": 130,
+                        "Nitrate-N + Nitrite-N (g/m3)": 0.22
+                    }
+                ],
+                "date_recorded": "2025-02-17T12:36:00"
+            }
+        }
+    ]
+}

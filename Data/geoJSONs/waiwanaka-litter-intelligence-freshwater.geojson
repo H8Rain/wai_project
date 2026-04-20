@@ -1,0 +1,188 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {
+                "url": "https://litterintelligence.org/data/survey?id=3387",
+                "site_name": "Cardrona River",
+                "survey_type": "freshwater",
+                "colour": "#000000",
+                "date_recorded": "2024-12-19T00:00:00",
+                "id": "survey-polygon-freshwater-15",
+                "centroid_coordinates": [
+                    -44.715921500237286,
+                    169.15921949963135
+                ]
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            169.15882865194837,
+                            -44.716320514195175
+                        ],
+                        [
+                            169.15868334805165,
+                            -44.71617348580483
+                        ],
+                        [
+                            169.159610348869,
+                            -44.715522485804826
+                        ],
+                        [
+                            169.159755651131,
+                            -44.71566951419517
+                        ],
+                        [
+                            169.15882865194837,
+                            -44.716320514195175
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "url": "https://litterintelligence.org/data/survey?id=3387",
+                "site_name": "Cardrona River",
+                "survey_type": "freshwater",
+                "colour": "#000000",
+                "date_recorded": "2024-12-19T00:00:00",
+                "id": "survey-centroid-freshwater-15",
+                "is_centroid": true
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    169.15921949963135,
+                    -44.715921500237286
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "url": "https://litterintelligence.org/data/survey?id=3588",
+                "site_name": "Cardrona River",
+                "survey_type": "freshwater",
+                "colour": "#000000",
+                "date_recorded": "2025-06-18T00:00:00",
+                "id": "survey-polygon-freshwater-26",
+                "centroid_coordinates": [
+                    -44.715921500237286,
+                    169.15921949963135
+                ]
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            169.15882865194837,
+                            -44.716320514195175
+                        ],
+                        [
+                            169.15868334805165,
+                            -44.71617348580483
+                        ],
+                        [
+                            169.159610348869,
+                            -44.715522485804826
+                        ],
+                        [
+                            169.159755651131,
+                            -44.71566951419517
+                        ],
+                        [
+                            169.15882865194837,
+                            -44.716320514195175
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "url": "https://litterintelligence.org/data/survey?id=3588",
+                "site_name": "Cardrona River",
+                "survey_type": "freshwater",
+                "colour": "#000000",
+                "date_recorded": "2025-06-18T00:00:00",
+                "id": "survey-centroid-freshwater-26",
+                "is_centroid": true
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    169.15921949963135,
+                    -44.715921500237286
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "url": "https://litterintelligence.org/data/survey?id=3738",
+                "site_name": "Cardrona River ",
+                "survey_type": "freshwater",
+                "colour": "#000000",
+                "date_recorded": "2025-12-18T00:00:00",
+                "id": "survey-polygon-freshwater-34",
+                "centroid_coordinates": [
+                    -44.715921500237286,
+                    169.15921949963135
+                ]
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            169.15882865194837,
+                            -44.716320514195175
+                        ],
+                        [
+                            169.15868334805165,
+                            -44.71617348580483
+                        ],
+                        [
+                            169.159610348869,
+                            -44.715522485804826
+                        ],
+                        [
+                            169.159755651131,
+                            -44.71566951419517
+                        ],
+                        [
+                            169.15882865194837,
+                            -44.716320514195175
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "url": "https://litterintelligence.org/data/survey?id=3738",
+                "site_name": "Cardrona River ",
+                "survey_type": "freshwater",
+                "colour": "#000000",
+                "date_recorded": "2025-12-18T00:00:00",
+                "id": "survey-centroid-freshwater-34",
+                "is_centroid": true
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    169.15921949963135,
+                    -44.715921500237286
+                ]
+            }
+        }
+    ]
+}
