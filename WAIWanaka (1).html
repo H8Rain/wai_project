@@ -105,6 +105,26 @@
             margin-top: 60px;
             color: #222d47;
         }
+        #data-access-alert {
+            position: absolute;
+            top: 84px;
+            right: 15px;
+            z-index: 1002;
+            max-width: 520px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid #dc2626;
+            background-color: rgba(254, 242, 242, 0.95);
+            color: #7f1d1d;
+            font-size: 13px;
+            line-height: 1.4;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            display: none;
+        }
+        #data-access-alert strong {
+            display: block;
+            margin-bottom: 4px;
+        }
         .layer-color-circle { width: 15px; height: 15px; border-radius: 50%; margin-right: 5px; display: inline-block; }
         .layer-label { display: flex; align-items: center; margin-bottom: 5px; }
         #data-panel-content h3 { color: #005b94; font-weight: 500; margin-top: 0; }
@@ -165,6 +185,7 @@
         <div class="layer-label">
         </div>
     </div>
+    <div id="data-access-alert"></div>
 
     <script>
         mapboxgl.accessToken = 'pk.eyJ1IjoidGFpc2Vpc2hpbWl6dSIsImEiOiJjbThnczgzeWowNjE4MmxvajNuZWlyc2RwIn0.6pPnVaOpXZkOuMRTXAA6uA';
@@ -191,6 +212,18 @@
         const dataPanelClose = document.getElementById('data-panel-close');
         const infoButton = document.getElementById('info-button');
         const getInvolvedButton = document.getElementById('get-involved-button');
+        const dataAccessAlert = document.getElementById('data-access-alert');
+        const failedDatasetLoads = new Map();
+        const isFileProtocol = window.location.protocol === "file:";
+
+        function isLocalGeojsonPath(url) {
+            return (
+                url.startsWith("Data/") ||
+                url.startsWith("/Data/") ||
+                url.startsWith("./Data/") ||
+                url.startsWith("file://")
+            );
+        }
 
         const DATASETS = {
             "secchi": {
@@ -598,13 +631,25 @@
                     console.log(`Trying GeoJSON URL for ${dataset.data_type}:`, candidateUrl);
                     const response = await fetch(candidateUrl, { cache: "no-store" });
                     if (!response.ok) {
-                        lastError = new Error(`HTTP ${response.status} for ${candidateUrl}`);
+                        if (isFileProtocol && isLocalGeojsonPath(candidateUrl)) {
+                            lastError = new Error(
+                                `[LOCAL_FILE_ACCESS] Cannot access local GeoJSON while using file:// (${candidateUrl})`
+                            );
+                        } else {
+                            lastError = new Error(`HTTP ${response.status} for ${candidateUrl}`);
+                        }
                         continue;
                     }
                     const geojsonData = await response.json();
                     return { geojsonData, sourceUrl: candidateUrl };
                 } catch (error) {
-                    lastError = error;
+                    if (isFileProtocol && isLocalGeojsonPath(candidateUrl)) {
+                        lastError = new Error(
+                            `[LOCAL_FILE_ACCESS] Browser blocked local GeoJSON request (${candidateUrl})`
+                        );
+                    } else {
+                        lastError = error;
+                    }
                 }
             }
 
@@ -635,9 +680,49 @@
                     // Pass the cluster status to addClusterLayers
                     addClusterLayers(dataset.id, dataset.color, dataset.cluster || false);
                 }
+
+                if (failedDatasetLoads.has(dataKey)) {
+                    failedDatasetLoads.delete(dataKey);
+                    renderDataAccessAlert();
+                }
             } catch (error) {
                 console.error(`Error loading ${dataset.data_type} GeoJSON:`, error);
+                failedDatasetLoads.set(dataKey, {
+                    datasetName: dataset.data_type,
+                    primaryUrl: dataset.geojsonUrl,
+                    message: error && error.message ? error.message : String(error)
+                });
+                renderDataAccessAlert();
             }
+        }
+
+        function renderDataAccessAlert() {
+            if (!failedDatasetLoads.size) {
+                dataAccessAlert.style.display = "none";
+                dataAccessAlert.innerHTML = "";
+                return;
+            }
+
+            const lines = Array.from(failedDatasetLoads.values()).map(item => {
+                return `<div><strong>${item.datasetName}</strong> Data source is not accessible:<br>${item.primaryUrl}</div>`;
+            });
+
+            const hasLocalFileAccessIssue = Array.from(failedDatasetLoads.values()).some(item => {
+                return typeof item.message === "string" && item.message.includes("[LOCAL_FILE_ACCESS]");
+            });
+
+            let localFileHint = "";
+            if (hasLocalFileAccessIssue) {
+                localFileHint = `
+                <div style="margin-top:8px">
+                    <strong>Local File Access Failed</strong>
+                    <div>You opened the page with <code>file://</code>, and the browser blocked local GeoJSON access.</div>
+                    <div>Please run a local server, for example: <code>py -m http.server 8000</code>, then open <code>http://127.0.0.1:8000/WAIWanaka%20(1).html</code>.</div>
+                </div>`;
+            }
+
+            dataAccessAlert.innerHTML = `<strong>Data Access Error</strong>${lines.join("<hr style='border:0;border-top:1px solid #f5b4b4;margin:8px 0;'>")}${localFileHint}`;
+            dataAccessAlert.style.display = "block";
         }
 
         function addClusterLayers(sourceId, color) {
