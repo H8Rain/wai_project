@@ -574,6 +574,43 @@
             }
         };
 
+        function buildGeojsonFallbackUrls(primaryUrl) {
+            const marker = "/Data/geoJSONs/";
+            const markerIndex = primaryUrl.indexOf(marker);
+            if (markerIndex === -1) return [primaryUrl];
+
+            const filePart = primaryUrl.substring(markerIndex + marker.length);
+            return [
+                primaryUrl,
+                `https://h8rain.github.io/wai_project/Data/geoJSONs/${filePart}`,
+                `Data/geoJSONs/${filePart}`,
+                `/Data/geoJSONs/${filePart}`,
+                `https://citizen-science-data-map.github.io/MappingProjectData/Data/geoJSONs/${filePart}`
+            ];
+        }
+
+        async function fetchGeoJSONWithFallback(dataset) {
+            const candidateUrls = buildGeojsonFallbackUrls(dataset.geojsonUrl);
+            let lastError = null;
+
+            for (const candidateUrl of candidateUrls) {
+                try {
+                    console.log(`Trying GeoJSON URL for ${dataset.data_type}:`, candidateUrl);
+                    const response = await fetch(candidateUrl, { cache: "no-store" });
+                    if (!response.ok) {
+                        lastError = new Error(`HTTP ${response.status} for ${candidateUrl}`);
+                        continue;
+                    }
+                    const geojsonData = await response.json();
+                    return { geojsonData, sourceUrl: candidateUrl };
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw lastError || new Error(`All GeoJSON URL candidates failed for ${dataset.data_type}`);
+        }
+
         async function loadGeoJSON(dataKey) {
             const dataset = DATASETS[dataKey];
             if (!dataset) {
@@ -581,11 +618,8 @@
                 return;
             }
             try {
-                console.log("Fetching GeoJSON from:", dataset.geojsonUrl);
-                const response = await fetch(dataset.geojsonUrl);
-                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status} for ${dataset.geojsonUrl}`);
-                const geojsonData = await response.json();
-                console.log(`Loaded ${dataset.data_type} data:`, geojsonData);
+                const { geojsonData, sourceUrl } = await fetchGeoJSONWithFallback(dataset);
+                console.log(`Loaded ${dataset.data_type} data from ${sourceUrl}:`, geojsonData);
 
                 if (map.getSource(dataset.id)) {
                     map.getSource(dataset.id).setData(geojsonData);
@@ -602,7 +636,7 @@
                     addClusterLayers(dataset.id, dataset.color, dataset.cluster || false);
                 }
             } catch (error) {
-                console.error(`Error loading ${dataset.data_type} GeoJSON from ${dataset.geojsonUrl}:`, error);
+                console.error(`Error loading ${dataset.data_type} GeoJSON:`, error);
             }
         }
 
