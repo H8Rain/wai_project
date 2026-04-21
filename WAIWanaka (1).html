@@ -638,10 +638,15 @@
             }
         };
 
+        function withCacheBust(url) {
+            const separator = url.includes("?") ? "&" : "?";
+            return `${url}${separator}t=${Date.now()}`;
+        }
+
         function buildGeojsonFallbackUrls(primaryUrl) {
             const marker = "/Data/geoJSONs/";
             const markerIndex = primaryUrl.indexOf(marker);
-            if (markerIndex === -1) return [primaryUrl];
+            if (markerIndex === -1) return [withCacheBust(primaryUrl)];
 
             const filePart = primaryUrl.substring(markerIndex + marker.length);
             const remoteCandidates = [
@@ -654,8 +659,14 @@
                 `Data/geoJSONs/${filePart}`
             ];
 
-            // Always prefer Git-hosted GeoJSON first, then fall back to local files.
-            return [...remoteCandidates, ...localCandidates];
+            // Priority: Git raw URL first, then local files, then legacy mirror URLs.
+            const orderedCandidates = [
+                remoteCandidates[0],
+                ...localCandidates,
+                ...remoteCandidates.slice(1)
+            ];
+
+            return orderedCandidates.map(withCacheBust);
         }
 
         async function fetchGeoJSONWithFallback(dataset) {
