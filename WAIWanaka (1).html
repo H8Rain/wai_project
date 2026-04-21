@@ -644,9 +644,24 @@
             return `${url}${separator}t=${Date.now()}`;
         }
 
+        function getPinnedRevision() {
+            const rev = new URLSearchParams(window.location.search).get("rev");
+            if (!rev) return null;
+            return /^[0-9a-f]{7,40}$/i.test(rev) ? rev : null;
+        }
+
+        function applyPinnedRevision(url) {
+            const pinnedRevision = getPinnedRevision();
+            if (!pinnedRevision) return url;
+
+            const rawPrefix = "https://raw.githubusercontent.com/H8Rain/wai_project/";
+            if (!url.startsWith(rawPrefix)) return url;
+            return url.replace(`${rawPrefix}main/`, `${rawPrefix}${pinnedRevision}/`);
+        }
+
         function buildGeojsonFallbackUrls(primaryUrl) {
             // Single source of truth: always read from Git raw URL.
-            return [withCacheBust(primaryUrl)];
+            return [withCacheBust(applyPinnedRevision(primaryUrl))];
         }
 
         async function fetchGeoJSONWithFallback(dataset) {
