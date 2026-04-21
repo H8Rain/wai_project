@@ -215,6 +215,7 @@
         const dataAccessAlert = document.getElementById('data-access-alert');
         const failedDatasetLoads = new Map();
         const isFileProtocol = window.location.protocol === "file:";
+        const isLocalHost = ["127.0.0.1", "localhost"].includes(window.location.hostname);
 
         function isLocalGeojsonPath(url) {
             return (
@@ -665,13 +666,19 @@
                 ...localCandidates,
                 ...remoteCandidates.slice(1)
             ];
+            const localHostCandidates = [
+                remoteCandidates[0],
+                ...localCandidates
+            ];
+            const candidates = isLocalHost ? localHostCandidates : orderedCandidates;
 
-            return orderedCandidates.map(withCacheBust);
+            return candidates.map(withCacheBust);
         }
 
         async function fetchGeoJSONWithFallback(dataset) {
             const candidateUrls = buildGeojsonFallbackUrls(dataset.geojsonUrl);
             let lastError = null;
+            let fallbackEmptyResult = null;
 
             for (const candidateUrl of candidateUrls) {
                 try {
@@ -688,6 +695,16 @@
                         continue;
                     }
                     const geojsonData = await response.json();
+                    const isRepoRawCandidate = candidateUrl.includes("raw.githubusercontent.com/H8Rain/wai_project/");
+                    const featureCount = Array.isArray(geojsonData?.features) ? geojsonData.features.length : null;
+
+                    // In localhost demo mode, Git raw may briefly return stale empty data right after push.
+                    // Keep Git first, but continue to local file if raw is empty.
+                    if (isLocalHost && isRepoRawCandidate && featureCount === 0) {
+                        fallbackEmptyResult = { geojsonData, sourceUrl: candidateUrl };
+                        continue;
+                    }
+
                     return { geojsonData, sourceUrl: candidateUrl };
                 } catch (error) {
                     if (isFileProtocol && isLocalGeojsonPath(candidateUrl)) {
@@ -698,6 +715,10 @@
                         lastError = error;
                     }
                 }
+            }
+
+            if (fallbackEmptyResult) {
+                return fallbackEmptyResult;
             }
 
             throw lastError || new Error(`All GeoJSON URL candidates failed for ${dataset.data_type}`);
