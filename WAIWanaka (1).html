@@ -215,7 +215,6 @@
         const dataAccessAlert = document.getElementById('data-access-alert');
         const failedDatasetLoads = new Map();
         const isFileProtocol = window.location.protocol === "file:";
-        const isLocalHost = ["127.0.0.1", "localhost"].includes(window.location.hostname);
 
         function isLocalGeojsonPath(url) {
             return (
@@ -655,30 +654,14 @@
                 `https://h8rain.github.io/wai_project/Data/geoJSONs/${filePart}`,
                 `https://citizen-science-data-map.github.io/MappingProjectData/Data/geoJSONs/${filePart}`
             ];
-            const localCandidates = [
-                `/Data/geoJSONs/${filePart}`,
-                `Data/geoJSONs/${filePart}`
-            ];
 
-            // Priority: Git raw URL first, then local files, then legacy mirror URLs.
-            const orderedCandidates = [
-                remoteCandidates[0],
-                ...localCandidates,
-                ...remoteCandidates.slice(1)
-            ];
-            const localHostCandidates = [
-                remoteCandidates[0],
-                ...localCandidates
-            ];
-            const candidates = isLocalHost ? localHostCandidates : orderedCandidates;
-
-            return candidates.map(withCacheBust);
+            // Remote-only chain: Git raw first, then mirror URLs.
+            return remoteCandidates.map(withCacheBust);
         }
 
         async function fetchGeoJSONWithFallback(dataset) {
             const candidateUrls = buildGeojsonFallbackUrls(dataset.geojsonUrl);
             let lastError = null;
-            let fallbackEmptyResult = null;
 
             for (const candidateUrl of candidateUrls) {
                 try {
@@ -695,15 +678,6 @@
                         continue;
                     }
                     const geojsonData = await response.json();
-                    const isRepoRawCandidate = candidateUrl.includes("raw.githubusercontent.com/H8Rain/wai_project/");
-                    const featureCount = Array.isArray(geojsonData?.features) ? geojsonData.features.length : null;
-
-                    // In localhost demo mode, Git raw may briefly return stale empty data right after push.
-                    // Keep Git first, but continue to local file if raw is empty.
-                    if (isLocalHost && isRepoRawCandidate && featureCount === 0) {
-                        fallbackEmptyResult = { geojsonData, sourceUrl: candidateUrl };
-                        continue;
-                    }
 
                     return { geojsonData, sourceUrl: candidateUrl };
                 } catch (error) {
@@ -715,10 +689,6 @@
                         lastError = error;
                     }
                 }
-            }
-
-            if (fallbackEmptyResult) {
-                return fallbackEmptyResult;
             }
 
             throw lastError || new Error(`All GeoJSON URL candidates failed for ${dataset.data_type}`);
