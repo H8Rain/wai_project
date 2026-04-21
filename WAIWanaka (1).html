@@ -585,22 +585,53 @@
                 "id": "gyfw-data",
                 "data_type": "Get Your Feet Wet (GYFW) Stream Health",
                 "geojsonUrl": "https://raw.githubusercontent.com/H8Rain/wai_project/main/Data/geoJSONs/waiwanaka-gyfw.geojson",
-                "color": "#2a9d8f",
+                "color": "#dc2626",
                 "cluster": true,
                 "description":
                 `<div class="dataset-description-blurb">
     <details class="description-dropdown">
-        <summary><h5>What Is GYFW?</h5></summary>
+        <summary><h5>What Is It?</h5></summary>
         <div>
-            <p>Get Your Feet Wet (GYFW) is a practical stream health assessment used by staff and volunteers to monitor local stream condition over time.</p>
-            <p>Typical assessments include observations such as habitat quality, in-stream life indicators, flow condition, and other field notes collected at each site visit.</p>
+            <p>Get Your Feet Wet (GYFW) is a practical stream health assessment used by staff and volunteers to monitor stream condition over time.</p>
+            <p>Each survey captures observations from a specific site visit, allowing trends to be tracked across seasons and years.</p>
         </div>
     </details>
 
     <details class="description-dropdown">
-        <summary><h5>How To Read This Data</h5></summary>
+        <summary><h5>What Is Measured?</h5></summary>
         <div>
-            <p>Each point may contain one or multiple assessment events from the same location. Open the point to review the latest and historical entries recorded in the uploaded spreadsheet.</p>
+            <p>GYFW records can include field indicators such as:</p>
+            <ul>
+                <li><strong>Stream Health Score:</strong> A summary score for overall condition at the site.</li>
+                <li><strong>Habitat Quality:</strong> Notes on stream habitat structure and suitability for aquatic life.</li>
+                <li><strong>Macroinvertebrate Indicators:</strong> Signs of stream ecological condition based on in-stream life.</li>
+                <li><strong>Bank Stability:</strong> Observations of erosion risk and bank condition.</li>
+                <li><strong>Water Clarity Notes:</strong> Visual observations that help explain short-term changes.</li>
+            </ul>
+            <p>The exact fields shown depend on what was entered in the uploaded workbook.</p>
+        </div>
+    </details>
+
+    <details class="description-dropdown">
+        <summary><h5>How To Interpret This Data</h5></summary>
+        <div>
+            <p>Each map point may contain one or multiple assessment events from the same location.</p>
+            <ul>
+                <li>Open a point to review both recent and historical survey entries.</li>
+                <li>Compare repeated records at the same site to identify improving or declining trends.</li>
+                <li>Use notes and indicator values together, rather than relying on a single number.</li>
+            </ul>
+        </div>
+    </details>
+
+    <details class="description-dropdown">
+        <summary><h5>Why It Matters For Local Communities</h5></summary>
+        <div>
+            <ul>
+                <li><strong>Early Warning:</strong> Repeated assessments help detect stream stress before problems become severe.</li>
+                <li><strong>Better Planning:</strong> Results support decisions on restoration, riparian planting, and maintenance priorities.</li>
+                <li><strong>Community Action:</strong> A clear local record helps volunteers and staff focus effort where it has the greatest impact.</li>
+            </ul>
         </div>
     </details>
 </div>`
@@ -613,13 +644,18 @@
             if (markerIndex === -1) return [primaryUrl];
 
             const filePart = primaryUrl.substring(markerIndex + marker.length);
-            return [
+            const remoteCandidates = [
                 primaryUrl,
                 `https://h8rain.github.io/wai_project/Data/geoJSONs/${filePart}`,
-                `Data/geoJSONs/${filePart}`,
-                `/Data/geoJSONs/${filePart}`,
                 `https://citizen-science-data-map.github.io/MappingProjectData/Data/geoJSONs/${filePart}`
             ];
+            const localCandidates = [
+                `/Data/geoJSONs/${filePart}`,
+                `Data/geoJSONs/${filePart}`
+            ];
+
+            // Always prefer Git-hosted GeoJSON first, then fall back to local files.
+            return [...remoteCandidates, ...localCandidates];
         }
 
         async function fetchGeoJSONWithFallback(dataset) {
