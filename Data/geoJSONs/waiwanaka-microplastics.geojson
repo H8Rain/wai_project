@@ -19,7 +19,7 @@
                 "data_points": [
                     {
                         "date_recorded": "Autumn 2024",
-                        "microplastics per 60 litre": null
+                        "microplastics per 60 litre": 15.18
                     },
                     {
                         "date_recorded": "Summer 2025",
@@ -47,7 +47,7 @@
                 "data_points": [
                     {
                         "date_recorded": "Spring 2024",
-                        "microplastics per 60 litre": null
+                        "microplastics per 60 litre": 0.75
                     }
                 ],
                 "date_recorded": "Spring 2024"
@@ -99,6 +99,30 @@
                     }
                 ],
                 "date_recorded": "Autumn 2025"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    169.135694,
+                    -44.693179
+                ]
+            },
+            "properties": {
+                "id": "microplastics-point-6",
+                "site_name": "Lottie",
+                "colour": "#000000",
+                "count": 1,
+                "urls": [],
+                "data_points": [
+                    {
+                        "date_recorded": "Winter 2026",
+                        "microplastics per 60 litre": 33.0
+                    }
+                ],
+                "date_recorded": "Winter 2026"
             }
         }
     ]
